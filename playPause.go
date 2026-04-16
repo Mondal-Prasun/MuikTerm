@@ -289,6 +289,13 @@ func (p *Player) Update(msg tea.Msg) (Player, tea.Cmd) {
 	case PlayAll:
 		p.currentAudio = msg.cAudio
 		p.currentAudioIndex = msg.cAudioIndex
+
+		if p.isPlaying {
+			speaker.Lock()
+			p.ctrl.Paused = true
+			speaker.Unlock()
+			p.isPlaying = false
+		}
 		done := make(chan bool)
 		err := p.runAudio(msg.cAudio, true, done)
 
@@ -297,11 +304,16 @@ func (p *Player) Update(msg tea.Msg) (Player, tea.Cmd) {
 			return *p, func() tea.Msg {
 				return PlayerError{err: err}
 			}
-		}
-		p.isPlaying = !p.ctrl.Paused
-		return *p, func() tea.Msg {
-			<-done
-			return Next{}
+		} else {
+			p.isPlaying = !p.ctrl.Paused
+			return *p, tea.Batch(func() tea.Msg {
+				return Playing{
+					isPlaying: true,
+				}
+			}, func() tea.Msg {
+				<-done
+				return Next{}
+			})
 		}
 	case Playing:
 		if msg.isPlaying {
