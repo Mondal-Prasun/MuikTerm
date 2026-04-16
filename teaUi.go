@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"log"
 	"math/rand"
+	"os/exec"
 
 	"charm.land/bubbles/v2/list"
 	"charm.land/bubbles/v2/spinner"
@@ -44,6 +46,7 @@ type muikModel struct {
 	audioUilist  AudioList
 	player       Player
 	currentView  string
+	cavaCmd      *exec.Cmd
 	// viewport     viewport.Model
 }
 
@@ -56,8 +59,30 @@ func StartModel() muikModel {
 	loader.spinner.Style = spinnerStyle
 	loader.spinner.Spinner = spinner.MiniDot
 
+	cmd := exec.Command("cava", "-p", "E:/cava/config")
+
+	stdOut, err := cmd.StdoutPipe()
+
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	err = cmd.Start()
+
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	scanner := bufio.NewScanner(stdOut)
+
+	scanner.Buffer(make([]byte, 0, 1024), 1024*1024)
+
 	return muikModel{
 		loadAudio: loader,
+		cavaCmd:   cmd,
+		player: Player{
+			cavaScanner: scanner,
+		},
 	}
 }
 
@@ -66,6 +91,10 @@ func (m muikModel) Init() tea.Cmd {
 		m.loadAudio.Init(),
 		m.player.Init(),
 	)
+}
+
+func (m *muikModel) setProgram(prg *tea.Program) {
+	m.player.prg = prg
 }
 
 func (m *muikModel) setSequenceList() {
